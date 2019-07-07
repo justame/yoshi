@@ -150,7 +150,8 @@
     "xmldoc": "1.1.2",
     "yoshi-config": "4.12.0",
     "yoshi-helpers": "4.12.0",
-    "yoshi-runtime": "1.0.243"
+    "yoshi-runtime": "1.0.243",
+    "yoshi-server": "4.12.0"
   },
   "devDependencies": {
     "@babel/plugin-syntax-jsx": "7.2.0",
