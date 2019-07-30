@@ -29,7 +29,6 @@ const {
   STATICS_DIR,
   TSCONFIG_FILE,
   MONOREPO_ROOT,
-  API_DIR,
   TEMPLATES_DIR,
   TEMPLATES_BUILD_DIR,
 } = require('yoshi-config/paths');
@@ -50,7 +49,11 @@ const {
   unprocessedModules,
 } = require('yoshi-helpers/utils');
 const { defaultEntry } = require('yoshi-helpers/constants');
-const { addEntry, overrideRules } = require('../src/webpack-utils');
+const {
+  addEntry,
+  overrideRules,
+  findDynamicServerEntries,
+} = require('../src/webpack-utils');
 
 const reScript = /\.js?$/;
 const reStyle = /\.(css|less|scss|sass)$/;
@@ -160,6 +163,14 @@ const splitChunksConfig = isObject(useSplitChunks)
 const entry = project.entry || defaultEntry;
 
 const webWorkerEntry = project.webWorkerEntry;
+
+const serverEntry = ['./server', '../dev/server'].find(filename => {
+  return (
+    globby.sync(`${filename}(${extensions.join('|')})`, {
+      cwd: SRC_DIR,
+    }).length > 0
+  );
+});
 
 // Common function to get style loaders
 const getStyleLoaders = ({
@@ -770,6 +781,11 @@ function createClientWebpackConfig({
 
         // Rules for Style Sheets
         ...styleLoaders,
+
+        {
+          test: /\.api\.(js|ts)$/,
+          loader: require.resolve('yoshi-server/build/loader'),
+        },
       ],
     },
 
@@ -802,11 +818,7 @@ function createClientWebpackConfig({
 //
 // Configuration for the server-side bundle (server.js)
 // -----------------------------------------------------------------------------
-function createServerWebpackConfig({
-  isDebug = true,
-  isHmr = false,
-  hmrPort,
-} = {}) {
+function createServerWebpackConfig({ isDebug = true, isHmr = false } = {}) {
   const config = createCommonWebpackConfig({ isDebug, isHmr });
 
   const styleLoaders = getStyleLoaders({
@@ -822,14 +834,12 @@ function createServerWebpackConfig({
 
     target: 'node',
 
-    entry: globby
-      .sync('**/*.(js|ts)', { cwd: API_DIR, absolute: true })
-      .reduce((acc, filepath) => {
-        return {
-          ...acc,
-          [path.relative(SRC_DIR, filepath).replace(/\.[^/.]+$/, '')]: filepath,
-        };
-      }, {}),
+    entry: {
+      ...findDynamicServerEntries(config.context),
+      ...{
+        ...(serverEntry ? { server: serverEntry } : {}),
+      },
+    },
 
     output: {
       ...config.output,
@@ -837,7 +847,7 @@ function createServerWebpackConfig({
       filename: '[name].js',
       chunkFilename: 'chunks/[name].js',
       libraryTarget: 'umd',
-      libraryExport: 'default',
+      // libraryExport: 'default',
       globalObject: "(typeof self !== 'undefined' ? self : this)",
       // Point sourcemap entries to original disk location (format as URL on Windows)
       devtoolModuleFilenameTemplate: info =>
@@ -885,6 +895,13 @@ function createServerWebpackConfig({
 
         // Rules for Style Sheets
         ...styleLoaders,
+
+        {
+          test: /\.api\.(js|ts)$/,
+          // Explain why its here
+          issuer: () => true,
+          loader: require.resolve('yoshi-server/build/loader'),
+        },
       ],
     },
 
@@ -943,10 +960,6 @@ function createServerWebpackConfig({
 
     devtool: 'cheap-module-inline-source-map',
   };
-
-  // if (isHmr) {
-  //   addEntry(serverConfig, [`${require.resolve('./hot')}?${hmrPort}`]);
-  // }
 
   return serverConfig;
 }

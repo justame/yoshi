@@ -1,14 +1,19 @@
+const path = require('path');
 const cors = require('cors');
+const fs = require('fs-extra');
 const chalk = require('chalk');
 const webpack = require('webpack');
+const globby = require('globby');
 const clearConsole = require('react-dev-utils/clearConsole');
 const { prepareUrls } = require('react-dev-utils/WebpackDevServerUtils');
 const formatWebpackMessages = require('react-dev-utils/formatWebpackMessages');
 const project = require('yoshi-config');
-const { STATICS_DIR } = require('yoshi-config/paths');
+const { STATICS_DIR, ROUTES_DIR, SRC_DIR } = require('yoshi-config/paths');
 const { PORT } = require('./constants');
 const { redirectMiddleware } = require('../src/tasks/cdn/server-api');
 const WebpackDevServer = require('webpack-dev-server');
+const DynamicEntryPlugin = require('webpack/lib/DynamicEntryPlugin');
+const Watchpack = require('watchpack');
 
 const isInteractive = process.stdout.isTTY;
 
@@ -198,10 +203,55 @@ function waitForCompilation(compiler) {
   });
 }
 
+function findDynamicServerEntries(context) {
+  return [
+    ...(fs.pathExistsSync(SRC_DIR)
+      ? globby.sync('**/*.api.(js|ts)', { cwd: SRC_DIR, absolute: true })
+      : []),
+
+    ...(fs.pathExistsSync(ROUTES_DIR)
+      ? globby.sync('**/*.(js|ts)', { cwd: ROUTES_DIR, absolute: true })
+      : []),
+  ].reduce((acc, filepath) => {
+    return {
+      ...acc,
+      [path.relative(context, filepath).replace(/\.[^/.]+$/, '')]: filepath,
+    };
+  }, {});
+}
+
+function watchDynamicEntries(compiler, watching) {
+  const wp = new Watchpack();
+
+  wp.on('aggregated', () => {
+    watching.invalidate();
+  });
+
+  compiler.hooks.make.tapPromise('entries', async compilation => {
+    const entries = findDynamicServerEntries(compiler.context);
+
+    const promises = Object.keys(entries).map(name => {
+      const dep = DynamicEntryPlugin.createDependency(entries[name], name);
+
+      return new Promise((resolve, reject) => {
+        compilation.addEntry(compiler.context, dep, name, err =>
+          err ? reject(err) : resolve(),
+        );
+      });
+    });
+
+    await Promise.all(promises);
+  });
+
+  wp.watch([], [SRC_DIR, ROUTES_DIR]);
+}
+
 module.exports = {
   createDevServer,
   createCompiler,
   waitForCompilation,
   addEntry,
   overrideRules,
+  findDynamicServerEntries,
+  watchDynamicEntries,
 };

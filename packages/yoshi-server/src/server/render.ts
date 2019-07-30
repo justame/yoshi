@@ -5,9 +5,12 @@ import { TEMPLATES_BUILD_DIR } from 'yoshi-config/paths';
 export default async (templateName: string, data: any = {}) => {
   const absolutePath = path.resolve(
     TEMPLATES_BUILD_DIR,
-    `${templateName}.debug.ejs`,
+    process.env.NODE_ENV === 'development'
+      ? `${templateName}.debug.ejs`
+      : `${templateName}.prod.ejs`,
   );
-  const html = await ejs.renderFile(absolutePath, data);
+
+  const html: string = await ejs.renderFile(absolutePath, data);
 
   return html;
 };
