@@ -103,6 +103,13 @@ const logo = require("./logo.svg");
 const App = () => <img src={logo} />;
 ```
 
+### Assets import in scss files
+
+Add ~ prefix to url() function in scss
+```diff
+- background: #FFF url(../../../../assets/svgs/arrow-down.svg) no-repeat right 3px;
++ background: #FFF url(~../../../../assets/svgs/arrow-down.svg) no-repeat right 3px;
+```
 If you want to keep this specific use-case working, you'll need to update it like the following:
 
 ```js
