@@ -54,6 +54,7 @@ const {
   overrideRules,
   findDynamicServerEntries,
 } = require('../src/webpack-utils');
+const ExportDefaultPlugin = require('../src/webpack-plugins/export-default-plugin');
 
 const reScript = /\.js?$/;
 const reStyle = /\.(css|less|scss|sass)$/;
@@ -925,6 +926,8 @@ function createServerWebpackConfig({ isDebug = true, isHmr = false } = {}) {
 
     plugins: [
       ...config.plugins,
+
+      new ExportDefaultPlugin(),
 
       // https://webpack.js.org/plugins/banner-plugin/
       new webpack.BannerPlugin({
