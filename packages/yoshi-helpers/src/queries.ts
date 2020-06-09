@@ -6,6 +6,9 @@ import * as globs from 'yoshi-config/build/globs';
 import { POM_FILE } from 'yoshi-config/build/paths';
 import isCi from 'is-ci';
 import { defaultEntry } from './constants';
+import { tryRequire } from './utils';
+
+const ciBuildInfo = tryRequire('@wix/ci-build-info');
 
 export const exists = (
   patterns: string | ReadonlyArray<string>,
@@ -76,7 +79,11 @@ export const hasBundleInStaticsDir = (cwd = process.cwd()) => {
   );
 };
 
-export const shouldDeployToCDN = () => {
+export const shouldDeployToCDN = (packageName: string) => {
+  if (ciBuildInfo) {
+    const buildInfo = ciBuildInfo.getBuildInfoByPackageName(packageName);
+    return isCi && buildInfo.artifactVersion;
+  }
   return (
     isCi &&
     (process.env.ARTIFACT_VERSION || process.env.SRC_MD5) &&
